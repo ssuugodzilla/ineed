@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>自洽计划-玛尼堆</title>
+    <style>
+        body {
+            background: #F5A3C7;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .petal {
+            position: absolute;
+            width: 18px;
+            height: 30px;
+            background: linear-gradient(145deg, #FFB6C180, #FFFFFFB3);
+            clip-path: path('M9 0C13.5 0 18 6 18 15C18 24 9 30 9 30C9 30 0 24 0 15C0 6 4.5 0 9 0Z');
+            animation: fall 8s linear infinite;
+            transform-origin: 50% 100%;
+            opacity: 0.8;
+        }
+
+        @keyframes fall {
+            0% { transform: translateY(-10vh) rotate(0deg); opacity: 0.8; }
+            100% { transform: translateY(110vh) rotate(720deg); opacity: 0.3; }
+        }
+
+        #mani-stone {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -120%);
+            z-index: 1;
+            width: 680px;
+            height: 500px;
+        }
+
+        .stone {
+            position: absolute;
+            width: 60px;
+            height: 40px;
+            clip-path: polygon(
+                0 25%, 10% 0, 30% 10%, 45% 0,
+                65% 15%, 85% 5%, 100% 25%,
+                90% 60%, 70% 100%, 30% 90%, 0 70%
+            );
+            border-radius: 8px;
+            box-shadow: 3px 3px 8px rgba(0,0,0,0.2);
+            transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        .stone-text {
+            position: absolute;
+            width: 90%;
+            height: 60%;
+            top: 20%;
+            left: 5%;
+            color: rgba(255,255,255,0.9);
+            font: 14px '楷体', cursive;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        .scroll-text {
+            animation: scroll 8s linear infinite;
+            display: inline-block;
+            padding-left: 100%;
+        }
+
+        @keyframes scroll {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-100%); }
+        }
+
+        .voice-ui {
+            position: fixed;
+            bottom: 20%;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            z-index: 2;
+        }
+
+        #mic-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #FFFFFF;
+            border: none;
+            cursor: pointer;
+            margin-bottom: 20px;
+            transition: background 0.3s;
+        }
+
+        #mic-btn:active { background: #8EC5D1 !important; }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        #text-input {
+            width: 300px;
+            padding: 15px;
+            border: 2px solid #95C480;
+            border-radius: 25px;
+            font-size: 16px;
+            background: rgba(255,255,255,0.9);
+        }
+
+        #send-btn {
+            padding: 15px 25px;
+            background: #95C480;
+            border: none;
+            border-radius: 25px;
+            color: white;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        #send-btn:hover { background: #7DAF6D; }
+    </style>
+</head>
+<body>
+    <div id="mani-stone"></div>
+    <div class="voice-ui">
+        <button id="mic-btn">🎤</button>
+        <h3 style="color:#636363;">自我祝颂</h3>
+        <div class="input-group">
+            <input type="text" id="text-input" placeholder="说出或写下您的祝福...">
+            <button id="send-btn">发送</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // 花瓣生成
+            for(let i=0; i<25; i++) {
+                const petal = document.createElement('div');
+                petal.className = 'petal';
+                petal.style.width = (15 + Math.random()*8) + 'px';
+                petal.style.height = (25 + Math.random()*15) + 'px';
+                petal.style.left = Math.random()*100 + 'vw';
+                petal.style.animationDelay = Math.random()*10 + 's';
+                petal.style.transform += `skew(${Math.random()*20-10}deg)`;
+                document.body.appendChild(petal);
+            }
+
+            // 石块系统
+            const MAX_LAYERS = 5;
+            const STONES_PER_LAYER = [10, 8, 6, 4, 2];
+            const STONE_COLORS = ['#A9A9A9','#6D4C41','#BCAAA4','#8D6E63','#795548','#A1887F'];
+            let currentLayer = 0, stonesInLayer = 0, lastColor = -1;
+
+            // 交互系统
+            const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = 'zh-CN';
+            
+            document.getElementById('mic-btn').addEventListener('mousedown', () => recognition.start());
+            document.getElementById('send-btn').addEventListener('click', processInput);
+            document.getElementById('text-input').addEventListener('keypress', e => {
+                if(e.key === 'Enter') processInput()
+            });
+
+            recognition.onresult = e => {
+                const text = e.results[0][0].transcript;
+                document.getElementById('text-input').value = text;
+                processInput();
+            }
+
+            function processInput() {
+                const input = document.getElementById('text-input');
+                const text = input.value.trim();
+                if(!text) return;
+
+                addStone(text);
+                input.value = '';
+            }
+
+            function addStone(text) {
+                // 层级堆叠逻辑
+                if(stonesInLayer >= STONES_PER_LAYER[currentLayer]) {
+                    const stone = createStone(text, true);
+                    stone.style.left = `${50 + (Math.random()-0.5)*30}%`;
+                    stone.style.top = '20%';
+                    animateFall(stone);
+                    return;
+                }
+
+                const stone = createStone(text);
+                positionStone(stone);
+                document.getElementById('mani-stone').appendChild(stone);
+
+                stonesInLayer++;
+                if(stonesInLayer >= STONES_PER_LAYER[currentLayer]) {
+                    currentLayer = Math.min(currentLayer+1, MAX_LAYERS-1);
+                    stonesInLayer = 0;
+                }
+            }
+
+            function createStone(text, isFalling = false) {
+                const stone = document.createElement('div');
+                stone.className = 'stone';
+                
+                // 颜色控制
+                let colorIndex;
+                do { colorIndex = Math.floor(Math.random()*STONE_COLORS.length); } 
+                while(colorIndex === lastColor);
+                stone.style.background = STONE_COLORS[colorIndex];
+                lastColor = colorIndex;
+
+                // 文字雕刻
+                const textDiv = document.createElement('div');
+                textDiv.className = 'stone-text';
+                const displayText = text.length > 4 ? 
+                    `<div class="scroll-text">${text}</div>` : text.slice(0,4);
+                textDiv.innerHTML = displayText;
+
+                stone.appendChild(textDiv);
+                if(isFalling) stone.style.position = 'fixed';
+                return stone;
+            }
+
+            function positionStone(stone) {
+                const baseWidth = STONES_PER_LAYER[currentLayer] * 65;
+                const xPos = (680 - baseWidth)/2 + stonesInLayer*65;
+                const yPos = currentLayer * 45;
+
+                stone.style.left = `${xPos}px`;
+                stone.style.top = `${yPos}px`;
+                stone.style.transform = `
+                    rotate(${Math.random()*15-7.5}deg)
+                    scale(${0.9 + Math.random()*0.2})
+                `;
+            }
+
+            function animateFall(stone) {
+                const angle = Math.random()*60-30;
+                const distance = 300 + Math.random()*200;
+                
+                stone.style.transition = 'all 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+                stone.style.transform = `
+                    rotate(${angle}deg)
+                    translate(${distance * Math.sign(angle)}px, 200px)
+                    scale(0.7)
+                `;
+                
+                setTimeout(() => {
+                    stone.style.opacity = '0';
+                    setTimeout(() => stone.remove(), 1200);
+                }, 100);
+                document.body.appendChild(stone);
+            }
+        });
+    </script>
+</body>
+</html>
